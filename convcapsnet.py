@@ -37,6 +37,13 @@ def squash(x, axis=-1):
     scale = K.sqrt(s_squared_norm) / (1.0 + s_squared_norm)
     return (scale * x)
 
+# capsule compatible batch_dot
+def caps_batch_dot(x, y):
+    x = K.expand_dims(x, 2)
+    if K.int_shape(x)[3] is not None:
+        y = K.permute_dimensions(y, (0,1,3,2))
+    o = tf.matmul(x, y)
+    return K.squeeze(o, 2)
 
 class Mask(layers.Layer):
     """
@@ -155,12 +162,11 @@ class Capsule(Layer):
         b = K.zeros_like(hat_inputs[:, :, :, 0])
         for i in range(self.routings):
             c = softmax(b, 1)
-            o = self.activation(keras.backend.batch_dot(c, hat_inputs, [2, 2]))
+            o = self.activation(caps_batch_dot(c, hat_inputs))
             if i < self.routings - 1:
-                b = keras.backend.batch_dot(o, hat_inputs, [2, 3])
+                b = caps_batch_dot(o, hat_inputs)
                 if K.backend() == 'theano':
                     o = K.sum(o, axis=1)
-
         return o
 
     def compute_output_shape(self, input_shape):
@@ -180,41 +186,49 @@ callbacks_list = [checkpoint]
 
 input_image = Input(shape=(128, 128, 3))
 
-x1 = Conv2D(32, (3, 3), padding = 'same', activation='relu')(input_image)
+x1 = Conv2D(32, (7, 7), padding = 'valid', activation='relu')(input_image)
 x1 = BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', beta_regularizer=None, gamma_regularizer=None, beta_constraint=None, gamma_constraint=None)(x1)
-#x1 = Conv2D(32, (3, 3), padding = 'same', activation='relu')(x1)
+x1 = Conv2D(64, (7, 7), padding = 'valid', activation='relu')(x1)
+x1 = tf.keras.layers.ZeroPadding2D(padding=(8, 8))(x1)
 x1 = AveragePooling2D((2, 2))(x1)
-x1 = Conv2D(64, (3, 3), padding = 'same', activation='relu')(x1)
+x1 = Conv2D(128, (7, 7), padding = 'valid', activation='relu')(x1)
+
+
 #x1 = Conv2D(64, (3, 3), padding = 'same', activation='relu')(x1)
 
-x1 = Dropout(.5)(x1)
-x1 = Conv2D(128, (3, 3), padding = 'same', activation='relu')(x1)
-#x1 = Conv2D(128, (3, 3), padding = 'same', activation='relu')(x1)
+#x1 = Dropout(.5)(x1)
+#x1 = Conv2D(128, (7, 7), padding = 'same', activation='relu')(x1)
+##x1 = Conv2D(128, (3, 3), padding = 'same', activation='relu')(x1)
 
-x2 = Conv2D(32, (5, 5), padding = 'same',activation='relu')(input_image)
+x2 = Conv2D(32, (5, 5), padding = 'valid',activation='relu')(input_image)
 x2 = BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', 
                        gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', 
                        beta_regularizer=None, gamma_regularizer=None, beta_constraint=None, gamma_constraint=None)(x2)
 #x2 = Conv2D(32, (5, 5),padding = 'same',activation='relu')(x2)
-x2 = AveragePooling2D((2, 2))(x2)
+#x2 = AveragePooling2D((2, 2))(x2)
 #x2 = Conv2D(64, (5, 5), padding = 'same',activation='relu')(x2)
-x2 = Conv2D(64, (5, 5), padding = 'same',activation='relu')(x2)
-
+x2 = Conv2D(64, (5, 5), padding = 'valid',activation='relu')(x2)
+x2 = tf.keras.layers.ZeroPadding2D(padding=(4, 4))(x2)
+x2 = AveragePooling2D((2, 2))(x2)
 x2 = Dropout(.5)(x2)
-x2 = Conv2D(128, (5, 5), padding = 'same',activation='relu')(x2)
-#x2 = Conv2D(128, (5, 5), padding = 'same',activation='relu')(x2)
+x2 = Conv2D(128, (5, 5), padding = 'valid',activation='relu')(x2)
 
-x3 = Conv2D(32, (7, 7), padding = 'same',activation='relu')(input_image)
+
+#x2 = Conv2D(128, (5, 5), padding = 'same',activation='relu')(x2)'''
+
+x3 = Conv2D(32, (3, 3), padding = 'valid',activation='relu')(input_image)
 x3 = BatchNormalization(axis=-1, momentum=0.99, epsilon=0.001, center=True, scale=True, beta_initializer='zeros', 
                         gamma_initializer='ones', moving_mean_initializer='zeros', moving_variance_initializer='ones', 
                         beta_regularizer=None, gamma_regularizer=None, beta_constraint=None, gamma_constraint=None)(x3)
-#x3 = Conv2D(32, (7, 7), padding = 'same',activation='relu')(x3)
-x3 = AveragePooling2D((2, 2))(x3)
-x3 = Conv2D(64, (7, 7), padding = 'same',activation='relu')(x3)
-#x3 = Conv2D(64, (7, 7), padding = 'same',activation='relu')(x3)
+#x3 = Conv2D(32, (3, 3), padding = 'same',activation='relu')(x3)
+#x3 = AveragePooling2D((2, 2))(x3)
+#x3 = Conv2D(64, (3, 3), padding = 'same',activation='relu')(x3)
+x3 = Conv2D(64, (3, 3), padding = 'valid',activation='relu')(x3)
 x3 = Dropout(.5)(x3)
-x3 = Conv2D(128, (7, 7), padding = 'same',activation='relu')(x3)
-#x3 = Conv2D(128, (7, 7), padding = 'same',activation='relu')(x3)
+x3 = AveragePooling2D((2, 2))(x3)
+x3 = Conv2D(128, (3, 3), padding = 'valid',activation='relu')(x3)
+#x3 = Conv2D(128, (3, 3), padding = 'same',activation='relu')(x3)
+
 
 x = Concatenate()([x1, x2, x3])
 
